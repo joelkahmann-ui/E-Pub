@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reader – EPUB-Reader</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Literata:opsz,wght@7..72,400;7..72,600&family=Nunito:wght@400;700;800&family=Patrick+Hand&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{--ui:'Nunito',system-ui,sans-serif;--fs:19px;--lh:1.65;--ff:'Literata',Georgia,serif;--ta:left;--pw:440px;--sw:880px;--bh:700px;--px:30px;--py:33px;--cw:440px;--chh:634px;
+--bg:#d4d4d1;--bg2:#dcdcd9;--paper:#f1f0ed;--ink:#2b2b2b;--acc:#555;--onacc:#fff;--cover:#6a6a68;--panel:#e6e5e2;--line:#c8c7c3}
+[data-theme=honey]{--bg:#cfc8bb;--bg2:#d9d3c8;--paper:#ece7dc;--ink:#2e2a24;--acc:#6b5f4d;--cover:#77705f;--panel:#e0dace;--line:#c4bdae}
+[data-theme=sage]{--bg:#c3c9c4;--bg2:#cfd4d0;--paper:#e8ece8;--ink:#26302b;--acc:#4d5a52;--cover:#5d6a62;--panel:#dbe0dc;--line:#bcc3be}
+[data-theme=moon]{--bg:#1c1c1e;--bg2:#272729;--paper:#2a2a2c;--ink:#d8d8d6;--acc:#a8a8a6;--onacc:#1c1c1e;--cover:#3a3a3c;--panel:#252527;--line:#3c3c3f}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;overflow:hidden;font-family:var(--ui);color:var(--ink);background:radial-gradient(circle at 15% 10%,var(--bg2),transparent 55%),radial-gradient(circle at 90% 95%,var(--bg2),transparent 50%),var(--bg);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header,footer{display:flex;align-items:center;gap:10px;padding:10px 14px}
+.logo{font:600 22px 'Nunito',var(--ui);color:var(--acc);white-space:nowrap}
+#ttl{flex:1;min-width:0;text-align:center;font-weight:700;opacity:.75;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn{width:44px;height:44px;flex:none;display:grid;place-items:center;border-radius:50%;border:2px solid var(--line);background:var(--panel);color:var(--ink);font:700 22px var(--ui);cursor:pointer;transition:transform .15s}
+.btn:hover{transform:scale(1.1) rotate(-4deg)}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+main{flex:1;display:grid;place-items:center;min-height:0}
+#book{position:relative;width:var(--sw);height:var(--bh);touch-action:none;user-select:none;cursor:grab}
+#cover{position:absolute;inset:-9px -13px -11px -11px;border-radius:12px 22px 22px 12px;background:var(--cover);box-shadow:0 18px 40px rgba(60,20,30,.3),inset 0 0 0 3px rgba(255,255,255,.25)}
+#cover::after{content:'';position:absolute;inset:5px;border:2px solid rgba(255,255,255,.12);border-radius:inherit}
+.ribbon{position:absolute;right:38px;top:-14px;width:18px;height:70px;background:var(--acc);clip-path:polygon(0 0,100% 0,100% 100%,50% 82%,0 100%);z-index:5;pointer-events:none}
+.pg{position:absolute;top:0;width:var(--pw);height:100%;background:var(--paper);overflow:hidden}
+.pg::after{content:'';position:absolute;inset:0;pointer-events:none}
+.pg[data-s=R]::after{background:linear-gradient(90deg,rgba(60,30,30,.17),transparent 9%)}
+.pg[data-s=L]::after{background:linear-gradient(270deg,rgba(60,30,30,.17),transparent 9%)}
+#e2{box-shadow:1px 1px 0 var(--line),2px 2px 0 var(--paper),3px 3px 0 var(--line)}
+.crease{position:absolute;top:0;height:100%;width:30px;left:calc(var(--pw) - 15px);background:linear-gradient(90deg,transparent,rgba(40,20,20,.2),transparent);pointer-events:none}
+.fx{position:absolute;left:0;top:0;transform-origin:0 0;width:var(--sw);height:var(--bh);pointer-events:none;display:none}
+#flw{position:absolute;inset:0;pointer-events:none}
+.sd{position:absolute;width:170px;height:4000px;margin-top:-2000px;transform-origin:0 50%}
+.sd.fl{background:linear-gradient(90deg,rgba(0,0,0,.34),rgba(255,255,255,.2) 16px,rgba(0,0,0,0) 150px)}
+.sd.fr{background:linear-gradient(90deg,rgba(0,0,0,.22),rgba(0,0,0,0) 110px)}
+.sd.ca{background:linear-gradient(90deg,rgba(0,0,0,.3),rgba(0,0,0,0) 80px)}
+.clip{position:absolute;left:var(--px);top:var(--py);width:var(--cw);height:var(--chh);overflow:hidden}
+.flow{position:absolute;left:0;top:0;width:var(--cw);height:var(--chh);column-width:var(--cw);column-gap:0;column-fill:auto;font:var(--fs)/var(--lh) var(--ff);text-align:var(--ta);hyphens:auto;-webkit-hyphens:auto;color:var(--ink)}
+.flow p{margin:0 0 .7em;orphans:2;widows:2}
+.flow h1,.flow h2,.flow h3{font:600 1.5em/1.25 'Nunito',var(--ui);color:var(--acc);margin:.2em 0 .6em;break-after:avoid;text-align:left}
+.flow blockquote{margin:1em 0;padding-left:1em;border-left:3px solid var(--acc)}
+.flow img{display:block;max-width:100%;max-height:calc(var(--chh)*.8);margin:0 auto;border-radius:10px}
+.ch{break-before:column}.ch:first-child{break-before:auto}
+footer{justify-content:center}
+#prog{flex:1;max-width:420px;accent-color:var(--acc)}
+#pg{font-weight:700;font-size:14px;min-width:130px;text-align:right}
+.sheet{position:fixed;right:12px;top:calc(64px + env(safe-area-inset-top));width:min(350px,calc(100vw - 24px));max-height:calc(100dvh - 130px);overflow:auto;background:var(--panel);border:2px solid var(--line);border-radius:22px;padding:14px 18px 18px;box-shadow:0 14px 40px rgba(0,0,0,.28);transform:translateY(-12px) scale(.96);opacity:0;pointer-events:none;transition:.22s;z-index:20}
+.sheet.on{transform:none;opacity:1;pointer-events:auto}
+.sheet h2{font:600 20px 'Nunito',var(--ui);margin:0 0 6px;color:var(--acc)}
+.row{margin:14px 0}.row>label,.row>b{display:flex;justify-content:space-between;font-weight:800;font-size:14px;margin-bottom:5px}
+.row input[type=range]{width:100%;accent-color:var(--acc)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:2px solid var(--line);background:transparent;color:var(--ink);border-radius:99px;padding:6px 12px;font:700 13px var(--ui);cursor:pointer}
+.chip[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:var(--onacc)}
+#toc button{display:block;width:100%;text-align:left;border:0;background:none;color:var(--ink);font:700 15px var(--ui);padding:9px 8px;border-radius:12px;cursor:pointer}
+#toc button:hover{background:var(--line)}
+#warm,#dim{position:fixed;inset:0;pointer-events:none}
+#warm{background:#ff9a3d;mix-blend-mode:multiply;z-index:50}
+#dim{background:#1a0f0a;z-index:51;opacity:0}
+#toast{position:fixed;left:50%;bottom:76px;transform:translate(-50%,20px);background:var(--acc);color:var(--onacc);padding:10px 18px;border-radius:99px;font-weight:800;opacity:0;transition:.3s;z-index:30;pointer-events:none;max-width:90vw;text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">Reader</span><span id="ttl"></span>
+  <button class="btn" id="bToc" title="Kapitel" aria-label="Kapitel">🔖</button>
+  <label class="btn" title="EPUB öffnen" tabindex="0">📚<input type="file" id="file" accept=".epub,application/epub+zip" hidden></label>
+  <button class="btn" id="bSet" title="Einstellungen" aria-label="Einstellungen">⚙️</button>
+</header>
+<main>
+  <div id="book">
+    <div id="cover"></div>
+    <div class="pg" id="e1"><div class="clip"><div class="flow"></div></div></div><div class="pg" id="e2"><div class="clip"><div class="flow"></div></div></div><i class="crease"></i>
+    <div class="fx" id="cast"><i class="sd ca"></i></div>
+    <div class="fx" id="fr"><div class="pg" id="e3"><div class="clip"><div class="flow"></div></div></div><i class="sd fr"></i></div>
+    <div id="flw"><div class="fx" id="fl"><div class="pg" id="e4"><div class="clip"><div class="flow"></div></div></div><i class="sd fl"></i></div></div>
+    <i class="ribbon"></i>
+  </div>
+</main>
+<footer>
+  <button class="btn" id="pv" aria-label="Zurück blättern">‹</button>
+  <input type="range" id="prog" min="0" max="0" value="0" aria-label="Lesefortschritt">
+  <button class="btn" id="nx" aria-label="Weiter blättern">›</button>
+  <span id="pg"></span>
+</footer>
+<aside class="sheet" id="toc"><h2>Kapitel</h2><div id="tl"></div></aside>
+<aside class="sheet" id="set"><h2>Einstellungen</h2><div id="sb"></div></aside>
+<div id="warm"></div><div id="dim"></div><div id="toast" role="status"></div>
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],root=document.documentElement;
+const D={view:'auto',theme:matchMedia('(prefers-color-scheme:dark)').matches?'moon':'berry',warm:.06,bright:100,fs:19,lh:1.65,pad:30,speed:750,ff:'lit',ta:'left',snd:true};
+const FF={lit:"'Literata',Georgia,serif",nun:"'Nunito',system-ui,sans-serif",hand:"'Patrick Hand','Comic Sans MS',cursive"};
+let S={...D};try{Object.assign(S,JSON.parse(localStorage.getItem('kb-s')||'{}'))}catch(e){}
+let B,N=1,cur=0,cw=440,chh=634,dir=0,a=0,raf=0,drag=false;
+
+
+/* ---------- Einstellungen ---------- */
+const RNG=[['warm','Wärme',0,.7,.01],['bright','Helligkeit',50,100,1],['fs','Schriftgröße',14,30,1],['lh','Zeilenabstand',1.3,2.1,.05],['pad','Seitenrand',14,52,2],['speed','Blättertempo (ms)',300,1400,50]];
+const CHP=[['view','Ansicht',[['auto','Auto'],['one','Eine Seite'],['two','Zwei Seiten']]],['theme','Farbwelt',[['berry','Stein'],['honey','Sand'],['sage','Schiefer'],['moon','Nacht']]],['ff','Schrift',[['lit','Buch'],['nun','Rund'],['hand','Handschrift']]],['ta','Satz',[['left','Linksbündig'],['justify','Blocksatz']]],['snd','Raschelgeräusch',[[true,'An'],[false,'Aus']]]];
+const PRE={day:{warm:.05,bright:100,theme:'berry'},candle:{warm:.5,bright:85,theme:'honey'},sleep:{warm:.62,bright:60,theme:'moon'}};
+function buildSet(){
+  $('#sb').innerHTML=`<div class="row"><b>Stimmung</b><div class="chips"><button class="chip" data-pre="day">Tageslicht</button><button class="chip" data-pre="candle">Kerzenlicht</button><button class="chip" data-pre="sleep">Schlummer</button></div></div>`
+  +RNG.map(([k,l,mn,mx,st])=>`<div class="row"><label for="r-${k}">${l}<span id="v-${k}"></span></label><input type="range" id="r-${k}" data-k="${k}" min="${mn}" max="${mx}" step="${st}" value="${S[k]}"></div>`).join('')
+  +CHP.map(([k,l,o])=>`<div class="row"><b>${l}</b><div class="chips">${o.map(([v,t])=>`<button class="chip" data-c="${k}" data-v='${JSON.stringify(v)}' aria-pressed="${S[k]===v}">${t}</button>`).join('')}</div></div>`).join('');
+  RNG.forEach(([k])=>{$('#r-'+k).value=S[k];$('#v-'+k).textContent=k=='warm'?Math.round(S[k]/.7*100)+'%':Math.round(S[k]*100)/100});
+}
+function apply(){
+  const st=root.style;st.setProperty('--fs',S.fs+'px');st.setProperty('--lh',S.lh);st.setProperty('--ff',FF[S.ff]);st.setProperty('--ta',S.ta);
+  root.dataset.theme=S.theme;$('#warm').style.opacity=S.warm;$('#dim').style.opacity=(100-S.bright)/100;
+  try{localStorage.setItem('kb-s',JSON.stringify(S))}catch(e){}
+}
+$('#sb').addEventListener('input',e=>{const k=e.target.dataset.k;if(!k)return;S[k]=+e.target.value;apply();buildValues();if(['fs','lh','pad'].includes(k))layout()});
+function buildValues(){RNG.forEach(([k])=>$('#v-'+k).textContent=k=='warm'?Math.round(S[k]/.7*100)+'%':Math.round(S[k]*100)/100)}
+$('#sb').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;
+  if(b.dataset.pre){Object.assign(S,PRE[b.dataset.pre])}else{S[b.dataset.c]=JSON.parse(b.dataset.v)}
+  apply();buildSet();layout()});
+
+/* ---------- Layout & Seiten ---------- */
+const E=['e1','e2','e3','e4'].map(i=>document.getElementById(i));
+let H=700,pw=440,SX=0,M2=false,nSp=1,sp=0,busy=false,fwd=true,fIdx=0,Y0=0,amp=0,sgn=1,ph=0,p=0,rsd=0,tA=0,lastPy=0;
+const pagesOf=s=>M2?[2*s-1,2*s]:[null,s],spOf=i=>M2?Math.floor((i+1)/2):i,curPage=()=>M2?Math.min(N-1,2*sp):sp,cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+function place(el,idx,side){
+  el.dataset.s=side;el.style.left=(side=='R'?SX:SX-pw)+'px';el.style.borderRadius=side=='R'?'4px 16px 16px 4px':'16px 4px 4px 16px';
+  const f=el.querySelector('.flow'),ok=idx!=null&&idx>=0&&idx<N;f.style.visibility=ok?'visible':'hidden';if(ok)f.style.transform=`translateX(${-idx*cw}px)`;
+}
+function fxShow(on){['cast','fr','fl'].forEach(k=>$('#'+k).style.display=on?'block':'none')}
+function idle(){const[l,r]=pagesOf(sp);E[0].style.display=$('.crease').style.display=M2?'block':'none';place(E[0],l,'L');place(E[1],r,'R');fxShow(false)}
+function show(){
+  $('#prog').value=sp;const v=pagesOf(sp).filter(i=>i!=null&&i>=0&&i<N).map(i=>i+1);
+  $('#pg').textContent=v.length>1?`Seiten ${v[0]}–${v[1]} von ${N}`:`Seite ${v[0]} von ${N}`;
+  try{localStorage.setItem('kb-p:'+B.title,N>1?curPage()/(N-1):0)}catch(e){}
+}
+function layout(r){
+  if(!B)return;cancelAnimationFrame(raf);busy=false;drag=false;
+  if(r===undefined)r=N>1?curPage()/(N-1):0;
+  const hh=$('header').offsetHeight+$('footer').offsetHeight,W=innerWidth;
+  M2=S.view=='two'||(S.view=='auto'&&W>=700);
+  H=Math.max(280,Math.min(innerHeight-hh-40,780));pw=Math.floor(Math.min(M2?(W-48)/2:W-40,540,H/1.2));SX=M2?pw:0;
+  $('#flw').style.overflow=M2?'hidden':'visible';const px=Math.min(+S.pad,pw*.14|0),py=Math.round(px*.9)+6;cw=pw-2*px;chh=H-2*py;
+  const s=root.style;s.setProperty('--pw',pw+'px');s.setProperty('--sw',(M2?2*pw:pw)+'px');s.setProperty('--bh',H+'px');s.setProperty('--px',px+'px');s.setProperty('--py',py+'px');s.setProperty('--cw',cw+'px');s.setProperty('--chh',chh+'px');
+  const f=E[1].querySelector('.flow');N=Math.max(1,Math.ceil((f.scrollWidth-3)/cw));
+  const cs=f.querySelectorAll('.ch');B.parts.forEach((q,i)=>q.page=cs[i]?Math.min(N-1,Math.round(cs[i].offsetLeft/cw)):0);
+  nSp=M2?Math.floor(N/2)+1:N;sp=Math.min(nSp-1,spOf(Math.round(r*(N-1))));$('#prog').max=nSp-1;idle();show();
+}
+function load(book,restore){
+  B=book;$('#ttl').textContent=book.title;
+  const h=book.parts.map(q=>`<div class="ch">${q.html}</div>`).join('');$$('.flow').forEach(f=>f.innerHTML=h);
+  $('#tl').innerHTML='';book.parts.forEach(q=>{const b=document.createElement('button');b.textContent=q.t;b.onclick=()=>{sp=Math.min(nSp-1,spOf(q.page));idle();show();panel()};$('#tl').append(b)});
+  let r=0;try{r=restore?+localStorage.getItem('kb-p:'+book.title)||0:0}catch(e){}
+  layout(r);setTimeout(()=>layout(),600);
+}
+
+/* ---------- Seitenumschlag: Falzgeometrie ---------- */
+function clip(poly,mx,my,dx,dy,s){const o=[];for(let i=0;i<poly.length;i++){const a=poly[i],b=poly[(i+1)%poly.length],da=s*((a[0]-mx)*dx+(a[1]-my)*dy),db=s*((b[0]-mx)*dx+(b[1]-my)*dy);
+  if(da>=0)o.push(a);if((da>=0)!==(db>=0)){const t=da/(da-db);o.push([a[0]+t*(b[0]-a[0]),a[1]+t*(b[1]-a[1])])}}return o}
+const poly=q=>q.length<3?'polygon(0 0,0 0,0 0)':'polygon('+q.map(v=>v[0].toFixed(1)+'px '+v[1].toFixed(1)+'px').join(',')+')';
+function sd(el,x,y,rad){const e=el.querySelector('.sd');e.style.left=x+'px';e.style.top=y+'px';e.style.transform=`rotate(${rad*180/Math.PI}deg)`}
+function draw(Px,Py){
+  Py=Y0+cl(Py-Y0,-.11*Math.abs(Px-SX-pw),.11*Math.abs(Px-SX-pw));
+  const Ox=SX+pw,vx=Px-Ox,vy=Py-Y0,L=Math.hypot(vx,vy),fr=$('#fr'),fl=$('#fl'),ca=$('#cast');
+  if(L<1){fr.style.clipPath='none';fl.style.display=ca.style.display='none';return}
+  fl.style.display=ca.style.display='block';
+  const dx=vx/L,dy=vy/L,Mx=(Ox+Px)/2,My=(Y0+Py)/2,rect=[[SX,0],[SX+pw,0],[SX+pw,H],[SX,H]];
+  const fold=clip(rect,Mx,My,dx,dy,-1),rem=clip(rect,Mx,My,dx,dy,1);
+  fr.style.clipPath=poly(rem);ca.style.clipPath=poly(fold);
+  const A=1-2*dx*dx,Bc=-2*dx*dy,D=1-2*dy*dy,k=2*(Mx*dx+My*dy),S2=2*SX;
+  fl.style.transform=`matrix(${-A},${-Bc},${Bc},${D},${S2*A+k*dx},${S2*Bc+k*dy})`;
+  fl.style.clipPath=poly(fold.map(v=>[S2-v[0],v[1]]));
+  sd(fr,Mx,My,Math.atan2(dy,dx));sd(ca,Mx,My,Math.atan2(-dy,-dx));sd(fl,S2-Mx,My,Math.atan2(-dy,dx));
+  fl.style.opacity=M2?1:p>.55?Math.max(0,1-(p-.55)/.4):1;
+}
+/* Pfad der Ecke: je nach Greifpunkt (Y0) rollt sich das Papier anders */
+const path=q=>Math.sin(Math.PI*q)*(sgn*amp+Math.sin(q*5+ph)*H*.035);
+function setP(q){p=q;const y=Y0+path(q)+rsd*(1-tA);lastPy=y;draw(SX+pw-2*pw*q,y)}
+function begin(d,y){
+  const f=d>0?sp:sp-1;if(busy||f<0||f>=nSp-1)return false;
+  busy=true;fwd=d>0;fIdx=f;Y0=cl(y,H*.1,H*.96);rsd=0;tA=0;
+  const t=(Y0/H-.5)*2;sgn=Math.abs(t)<.15?(Math.random()<.5?1:-1):(t>0?-1:1);amp=H*(.02+.04*Math.abs(t))*(.75+Math.random()*.6);ph=Math.random()*6.28;
+  const[l0,r0]=pagesOf(f),[l1,r1]=pagesOf(f+1);
+  E[0].style.display=M2?'block':'none';place(E[0],l0,'L');place(E[1],r1,'R');place(E[2],r0,'R');place(E[3],l1,'L');fxShow(true);
+  setP(fwd?0:1);return true;
+}
+function go(to){
+  cancelAnimationFrame(raf);const from=p,t0=performance.now(),red=matchMedia('(prefers-reduced-motion:reduce)').matches,dur=red?1:S.speed*Math.abs(to-from)+80;
+  rsd=lastPy-(Y0+path(from));tA=0;if(Math.abs(to-from)>.3)swish();
+  const step=t=>{const u=Math.min(1,(t-t0)/dur),e=u<.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;tA=u;setP(from+(to-from)*e);
+    if(u<1)raf=requestAnimationFrame(step);else{sp=to==1?fIdx+1:fIdx;busy=false;idle();show()}};
+  raf=requestAnimationFrame(step);
+}
+function turn(d,y){if(begin(d,y))go(d>0?1:0)}
+let ac;function swish(){if(!S.snd)return;try{ac=ac||new AudioContext();const n=ac.sampleRate*.4|0,b=ac.createBuffer(1,n,ac.sampleRate),d=b.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*Math.pow(Math.sin(Math.PI*i/n),2);
+  const s=ac.createBufferSource(),f=ac.createBiquadFilter(),g=ac.createGain();s.buffer=b;f.type='bandpass';f.frequency.value=1800+Math.random()*900;f.Q.value=.6;g.gain.value=.12;s.connect(f).connect(g).connect(ac.destination);s.start()}catch(e){}}
+
+const bk=$('#book');let px0=0,py0=0,rc;
+bk.addEventListener('pointerdown',e=>{if(busy)return;rc=bk.getBoundingClientRect();px0=e.clientX-rc.left;py0=e.clientY-rc.top;drag=false;bk.setPointerCapture(e.pointerId);panel()});
+bk.addEventListener('pointermove',e=>{if(!bk.hasPointerCapture(e.pointerId))return;const dx=e.clientX-rc.left-px0,dy=e.clientY-rc.top-py0;
+  if(!drag&&!busy&&Math.hypot(dx,dy)>8){const d=M2?(px0<rc.width/2?-1:1):(dx<0?1:-1);if(((d>0&&dx<0)||(d<0&&dx>0))&&begin(d,py0))drag=true}
+  if(drag){const g=M2?1:1.8,Px=cl((fwd?SX+pw:SX-pw)+dx*g,SX-pw,SX+pw);p=(SX+pw-Px)/(2*pw);lastPy=cl(Y0+dy,-H*.15,H*1.15);draw(Px,lastPy)}});
+bk.addEventListener('pointerup',e=>{if(drag){drag=false;go(fwd?(p>.3?1:0):(p<.7?0:1))}
+  else if(!busy&&Math.hypot(e.clientX-rc.left-px0,e.clientY-rc.top-py0)<8)turn((M2?px0<rc.width/2:px0<rc.width*.3)?-1:1,py0)});
+bk.addEventListener('pointercancel',()=>{if(drag){drag=false;go(fwd?0:1)}});
+$('#nx').onclick=()=>turn(1,H*(.3+.65*Math.random()));$('#pv').onclick=()=>turn(-1,H*(.3+.65*Math.random()));
+$('#prog').oninput=e=>{if(!busy){sp=+e.target.value;idle();show()}};
+addEventListener('keydown',e=>{if(e.target.matches('input[type=range]'))return;const y=H*(.3+.65*Math.random());
+  if(['ArrowRight','PageDown',' '].includes(e.key)){e.preventDefault();turn(1,y)}else if(['ArrowLeft','PageUp'].includes(e.key))turn(-1,y);else if(e.key=='Escape')panel()});
+addEventListener('resize',()=>layout());
+
+/* ---------- Panels & Toast ---------- */
+function panel(id){['toc','set'].forEach(k=>$('#'+k).classList.toggle('on',k===id&&!$('#'+k).classList.contains('on')))}
+$('#bToc').onclick=()=>panel('toc');$('#bSet').onclick=()=>panel('set');
+let tt;function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('on'),3200)}
+
+/* ---------- EPUB lesen ---------- */
+const res=(from,rel)=>decodeURIComponent(new URL(rel,'http://x/'+from).pathname.slice(1));
+async function openEpub(file){
+  toast('Buch wird geladen …');
+  try{
+    const z=await JSZip.loadAsync(file),rd=async p=>{const f=z.file(p);return f?f.async('string'):''},P=new DOMParser();
+    const cont=P.parseFromString(await rd('META-INF/container.xml'),'text/xml');
+    const opfPath=cont.querySelector('rootfile').getAttribute('full-path');
+    const opf=P.parseFromString(await rd(opfPath),'text/xml'),man={};
+    opf.querySelectorAll('manifest > item').forEach(i=>man[i.getAttribute('id')]=i.getAttribute('href'));
+    const title=(opf.getElementsByTagName('dc:title')[0]||{}).textContent||file.name.replace(/\.epub$/i,'');
+    const parts=[];let n=0;
+    for(const ref of opf.querySelectorAll('spine > itemref')){
+      const href=man[ref.getAttribute('idref')];if(!href)continue;
+      const path=res(opfPath,href),doc=P.parseFromString(await rd(path),'text/html'),bd=doc.body;if(!bd)continue;
+      bd.querySelectorAll('script,style,link,svg,audio,video,iframe').forEach(e=>e.remove());
+      for(const im of bd.querySelectorAll('img')){const f=z.file(res(path,im.getAttribute('src')||''));if(f)im.setAttribute('src',URL.createObjectURL(await f.async('blob')));else im.remove()}
+      bd.querySelectorAll('*').forEach(e=>[...e.attributes].forEach(at=>{if(!(e.tagName=='IMG'&&at.name=='src'))e.removeAttribute(at.name)}));
+      if(!bd.textContent.trim()&&!bd.querySelector('img'))continue;
+      const h=bd.querySelector('h1,h2,h3');n++;
+      parts.push({t:(h&&h.textContent.trim().slice(0,60))||'Kapitel '+n,html:bd.innerHTML});
+    }
+    if(!parts.length)throw 0;
+    load({title,parts},true);toast('Fertig.');
+  }catch(e){toast('Dieses EPUB konnte ich nicht lesen. Ist es vielleicht kopiergeschützt?')}
+}
+$('#file').onchange=e=>{if(e.target.files[0])openEpub(e.target.files[0]);e.target.value=''};
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files[0];if(f)openEpub(f)});
+
+/* ---------- Beispielbuch ---------- */
+const SAMPLE={title:'Der kleine Teekessel',parts:[
+{t:'Willkommen',html:`<h1>Willkommen</h1><p>Schön, dass du da bist. Mach es dir bequem – vielleicht mit einer Tasse Tee und einer Decke.</p><p><b>Blättern:</b> Tippe auf eine Seite oder greife sie an einer Ecke und ziehe sie weg. Je nachdem, wo du zupackst, rollt sich das Papier anders. Mit den Pfeiltasten geht es auch. Ab etwa 700 px Breite siehst du zwei Seiten, das lässt sich unter „Ansicht“ ändern.</p><p><b>Einstellungen:</b> Über das Zahnrad ⚙️ stellst du Wärme, Helligkeit, Schrift und Farben ein. „Kerzenlicht“ taucht den ganzen Bildschirm in warmes Licht.</p><p><b>Eigene Bücher:</b> Tippe auf 📚 oder ziehe eine EPUB-Datei einfach hierher. Der Reader merkt sich deine Position.</p>`},
+{t:'Kapitel 1 · Der Kessel',html:`<h1>Der kleine Teekessel</h1><h2>Kapitel 1</h2><p>In einem Haus am Ende der Wiese stand ein kleiner Teekessel auf dem Herd. Er war nicht besonders groß und auch nicht besonders glänzend, aber er hatte eine Beule am Bauch, die er sehr mochte.</p><p>„Die Beule“, sagte er manchmal zum Löffel, „ist von dem Tag, an dem ich zum ersten Mal gepfiffen habe.“</p><p>Der Löffel nickte, denn Löffel nicken zu allem. Draußen fiel der erste Regen des Herbstes, und die Fenster beschlugen, als hätte jemand ein Geheimnis hineingehaucht.</p><p>Jeden Abend, wenn es dunkel wurde, kam Oma Hanne in die Küche, summte ein Lied ohne Anfang und Ende und stellte den Kessel auf die Flamme.</p>`},
+{t:'Kapitel 2 · Der Pfiff',html:`<h2>Kapitel 2</h2><p>Eines Abends blieb die Küche still. Oma Hanne schlief im Sessel, ein Buch auf dem Bauch, und die Katze lag wie ein warmes Brötchen auf ihren Füßen.</p><p>Der kleine Teekessel wollte so gern pfeifen, aber niemand hatte ihn aufgestellt. „Dann pfeife ich eben ohne Wasser“, flüsterte er und probierte es. Es kam nur ein sehr leises, sehr schüchternes Pfffff heraus.</p><p>Die Katze öffnete ein Auge. „Das war hübsch“, sagte sie. „Mach das nochmal.“</p><p>Und so pfiff der Kessel, ganz leise, bis der Mond im Fenster stand und alle Tassen im Schrank lächelten.</p>`},
+{t:'Kapitel 3 · Der Tee',html:`<h2>Kapitel 3</h2><p>Am nächsten Morgen fand Oma Hanne den Kessel schon auf dem Herd, obwohl sie sich nicht erinnern konnte, ihn dorthin gestellt zu haben. Sie sah die Beule, sie sah den kleinen Dampf, und sie lächelte.</p><p>„Na dann“, sagte sie, „machen wir uns einen Tee.“</p><p>Es gab Pfefferminze mit einem Löffel Honig. Der Kessel pfiff dazu sein allerbestes Lied, und der Löffel nickte, wie immer, zu allem.</p><p>Und wenn du heute Abend ganz still bist, hörst du es vielleicht auch: ein leises Pfffff, irgendwo in der Nähe. Dann weißt du, dass es gemütlich ist.</p><p>Ende. 🍵</p>`}]};
+
+apply();buildSet();load(SAMPLE,true);
+document.fonts&&document.fonts.ready.then(()=>layout());
+setTimeout(()=>toast('Tipp: Zieh die Seite an einer Ecke – oben oder unten blättert es anders'),900);
+</script>
+</body>
+</html>
